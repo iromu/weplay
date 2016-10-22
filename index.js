@@ -2,7 +2,6 @@
 var sio = require('socket.io');
 
 var forwarded = require('forwarded-for');
-var debug = require('debug');
 
 process.title = 'weplay-io';
 
@@ -31,13 +30,13 @@ var keys = {
 };
 
 var uid = process.env.WEPLAY_SERVER_UID || port;
-debug('server uid %s', uid);
+console.log('server uid %s', uid);
 
 io.total = 0;
 io.on('connection', function (socket) {
     var req = socket.request;
     var ip = forwarded(req, req.headers);
-    debug('client ip %s', ip);
+    console.log('client ip %s', JSON.stringify(ip));
 
     // keep track of connected clients
     updateCount(++io.total);
