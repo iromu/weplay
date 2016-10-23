@@ -1,4 +1,3 @@
-
 var sio = require('socket.io');
 
 var forwarded = require('forwarded-for');
@@ -49,7 +48,12 @@ io.on('connection', function (socket) {
         if (!Array.isArray(log)) return;
         log.reverse().forEach(function (data) {
             data = data.toString();
-            socket.emit.apply(socket, JSON.parse(data));
+            var args = JSON.parse(data);
+            if (Array.isArray(args)) {
+                socket.emit.apply(socket, args);
+            } else {
+                console.error(data);
+            }
         });
     });
 
