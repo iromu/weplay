@@ -1,3 +1,5 @@
+'use strict';
+
 var sio = require('socket.io');
 
 var forwarded = require('forwarded-for');

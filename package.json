@@ -12,5 +12,9 @@
   },
   "scripts": {
     "start": "node index.js"
+  },
+  "engines": {
+    "node": ">=7.0.0"
   }
 }
+
