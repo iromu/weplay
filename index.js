@@ -1,5 +1,7 @@
 'use strict';
 
+const logger = require('weplay-common').logger('weplay-io');
+
 var sio = require('socket.io');
 var forwarded = require('forwarded-for');
 
@@ -7,7 +9,7 @@ process.title = 'weplay-io';
 
 const port = process.env.WEPLAY_PORT || 3001;
 const io = module.exports = sio(port);
-console.log(`listening on *:${port}`);
+logger.info(`listening on *:${port}`);
 
 const throttle = process.env.WEPLAY_IP_THROTTLE || 100;
 
@@ -16,7 +18,7 @@ const uri = process.env.WEPLAY_REDIS || 'redis://localhost:6379';
 io.adapter(require('socket.io-redis')(uri));
 
 // redis queries instance
-const redis = require('./redis')();
+const redis = require('weplay-common').redis();
 
 const keys = {
     right: 0,
@@ -30,13 +32,14 @@ const keys = {
 };
 
 const uid = process.env.WEPLAY_SERVER_UID || port;
-console.log('server uid %s', uid);
+logger.info('server uid %s', uid);
 
 io.total = 0;
 io.on('connection', socket => {
     const req = socket.request;
     const ip = forwarded(req, req.headers);
-    console.log('client ip %s', JSON.stringify(ip));
+
+    logger.info('client ip ', ip);
 
     // keep track of connected clients
     updateCount(++io.total);
@@ -50,10 +53,11 @@ io.on('connection', socket => {
         log.reverse().forEach(data => {
             data = data.toString();
             const args = JSON.parse(data);
+            logger.info('log', {args: args});
             if (Array.isArray(args)) {
                 socket.emit(...args);
             } else {
-                console.error(data);
+                logger.error(data);
             }
         });
     });
@@ -68,6 +72,7 @@ io.on('connection', socket => {
                     return;
                 }
             }
+            logger.info('move', {key: keys[key], move: key, socket: {nick: socket.nick, id: socket.id}});
             redis.set(`weplay:move-last:${ip}`, Date.now());
             redis.publish('weplay:move', keys[key]);
             socket.emit('move', key, socket.nick);
@@ -77,6 +82,7 @@ io.on('connection', socket => {
 
     // send chat mesages
     socket.on('message', msg => {
+        logger.info('message', {msg: msg, socket: {nick: socket.nick, id: socket.id}});
         broadcast(socket, 'message', msg, socket.nick);
     });
 
@@ -84,6 +90,7 @@ io.on('connection', socket => {
     socket.on('join', nick => {
         if (socket.nick) return;
         socket.nick = nick;
+        logger.info('joined', {socket: {nick: socket.nick, id: socket.id}});
         socket.emit('joined');
         broadcast(socket, 'join', nick);
     });
@@ -99,6 +106,7 @@ function updateCount(total) {
 
 function broadcast(socket/*, …*/) {
     const args = Array.prototype.slice.call(arguments, 1);
+    logger.info('broadcast', {args: args});
     redis.lpush('weplay:log', JSON.stringify(args));
     redis.ltrim('weplay:log', 0, 20);
     socket.broadcast.emit.apply(socket, args);
