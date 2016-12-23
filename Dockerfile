@@ -18,4 +18,4 @@ ENV WEPLAY_REDIS "redis://redis:$REDIS_PORT_6379_TCP_PORT"
 EXPOSE 8081
 
 # Run
-CMD [ "node", "index.js" ]
+ENTRYPOINT [ "node", "index.js" ]
