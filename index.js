@@ -23,7 +23,10 @@ const redis = require('weplay-common').redis();
 const sub = require('weplay-common').redis();
 
 
-logger.info('io listening', {port: port, uuid: uuid, adapter: uri});
+logger.debug('io listening', {port: port, uuid: uuid, adapter: uri});
+
+var clients = [];
+var clientsHashes = {};
 
 
 const keys = {
@@ -39,10 +42,13 @@ const keys = {
 
 
 io.total = 0;
+
+
 io.on('connection', socket => {
     const req = socket.request;
     const ip = forwarded(req, req.headers);
     const clientId = socket.id;
+    clients.push(clientId);
     var clientNick;
     var defaultHash;
     var currentHash;
@@ -50,16 +56,27 @@ io.on('connection', socket => {
     updateCount(++io.total);
 
     redis.get('weplay:rom:default', (err, _defaultHash) => {
-        defaultHash = _defaultHash;
-        currentHash = _defaultHash.toString();
-        logger.info('joining', currentHash);
-        socket.join(currentHash);
+        if (_defaultHash) {
+            defaultHash = _defaultHash;
+            currentHash = _defaultHash.toString();
+            join(currentHash, socket, clientId);
+        }
+        else {
+            logger.error('On connection found no default hash to join.', {id: socket.id, ip: ip});
+        }
     });
 
     socket.on('disconnect', () => {
         updateCount(--io.total);
         logger.info('disconnect', {nick: clientNick, id: socket.id, ip: ip});
         broadcast(socket, 'disconnected', clientNick);
+        if (currentHash) {
+            delete clientsHashes[clientId];
+            redis.publish(`weplay:leave:${currentHash}`, clientId);
+        }
+        redis.hdel('weplay:clients', clientId);
+        redis.hdel('weplay:nicks', clientId);
+        clients = clients.filter(item => item !== clientNick);
         clientNick = undefined;
     });
 
@@ -88,7 +105,12 @@ io.on('connection', socket => {
                     return;
                 }
             }
-            logger.info('weplay:move', {key: keys[key], move: key, socket: {nick: socket.nick, id: socket.id}, ip: ip});
+            logger.info('> weplay:move', {
+                key: keys[key],
+                move: key,
+                socket: {nick: socket.nick, id: socket.id},
+                ip: ip
+            });
             redis.set(`weplay:move-last:${clientId}`, Date.now());
             redis.expire(`weplay:move-last:${clientId}`, 1);
             redis.publish(`weplay:move:${currentHash}`, keys[key]);
@@ -112,10 +134,12 @@ io.on('connection', socket => {
             var game = command.split('#')[1];
             redis.get(`weplay:rom:${game}`, (err, hash) => {
                 if (hash) {
-                    if (currentHash)socket.leave(currentHash);
+                    if (currentHash) {
+                        socket.leave(currentHash);
+                        redis.publish(`weplay:leave:${currentHash}`, clientId);
+                    }
                     currentHash = hash.toString();
-                    logger.debug('weplay:command joining', currentHash);
-                    socket.join(currentHash);
+                    join(currentHash, socket, clientId);
                 }
             });
         });
@@ -136,6 +160,7 @@ io.on('connection', socket => {
         logger.info('join', {nick: socket.nick, id: socket.id, ip: ip});
         //logger.debug('joined', {socket: {nick: socket.nick, id: socket.id}});
         broadcast(socket, 'join', socket.nick);
+        redis.hset('weplay:nicks', clientId, nick);
         // event done, notify client
         socket.emit('joined');
     });
@@ -151,10 +176,33 @@ io.on('connection', socket => {
 
 });
 
+
 // sends connections count to everyone
 // by aggregating all servers
 function updateCount(total) {
     redis.hset('weplay:connections', uuid, total);
 }
 
-// broadcast events and persist them to redis
+function updateClients(clientId, hash) {
+    clientsHashes[clientId] = hash;
+    redis.hset('weplay:clients', clientId, JSON.stringify({hash: hash, io: uuid}));
+}
+
+function join(currentHash, socket, clientId) {
+    logger.info('joining', {hash: currentHash, clientId: clientId});
+    socket.join(currentHash);
+    updateClients(clientId, currentHash);
+    redis.publish(`weplay:join:${currentHash}`, clientId);
+}
+
+require('weplay-common').cleanup(function destroyData() {
+    logger.info('Destroying data.');
+    redis.hdel('weplay:connections', uuid);
+    clients.forEach(client=> {
+        redis.hdel('weplay:clients', client);
+        //redis.hdel('weplay:nicks', clientId);
+    });
+    for (var key in clientsHashes) {
+        redis.publish(`weplay:leave:${clientsHashes[key]}`, key);
+    }
+});
