@@ -13,9 +13,10 @@ RUN npm install
 ENV NODE_ENV production
 ENV WEPLAY_PORT 8081
 ENV WEPLAY_REDIS_URI "redis:6379"
-ENV WEPLAY_REDIS "redis://redis:$REDIS_PORT_6379_TCP_PORT"
+ENV WEPLAY_REDIS "redis://redis:6379"
+ENV WEPLAY_LOGSTASH_URI "logstash:5001"
 
 EXPOSE 8081
 
 # Run
-ENTRYPOINT [ "node", "index.js" ]
+CMD [ "node", "index.js" ]
