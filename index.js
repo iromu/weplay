@@ -20,8 +20,6 @@ io.adapter(require('socket.io-redis')(uri));
 
 // redis queries instance
 const redis = require('weplay-common').redis();
-const sub = require('weplay-common').redis();
-
 
 logger.debug('io listening', {port: port, uuid: uuid, adapter: uri});
 
@@ -68,7 +66,7 @@ io.on('connection', socket => {
 
     socket.on('disconnect', () => {
         updateCount(--io.total);
-        logger.info('disconnect', {nick: clientNick, id: socket.id, ip: ip});
+        logger.debug('disconnect', {nick: clientNick, id: socket.id, ip: ip});
         broadcast(socket, 'disconnected', clientNick);
         if (currentHash) {
             delete clientsHashes[clientId];
@@ -105,7 +103,7 @@ io.on('connection', socket => {
                     return;
                 }
             }
-            logger.info('> weplay:move', {
+            logger.debug('> weplay:move', {
                 key: keys[key],
                 move: key,
                 socket: {nick: socket.nick, id: socket.id},
@@ -128,7 +126,7 @@ io.on('connection', socket => {
                     return;
                 }
             }
-            logger.info('weplay:command', {command: command, socket: {nick: socket.nick, id: socket.id}, ip: ip});
+            logger.info('< weplay:command', {command: command, socket: {nick: socket.nick, id: socket.id}, ip: ip});
             redis.set(`weplay:command-last:${clientId}`, Date.now());
             redis.expire(`weplay:command-last:${clientId}`, 1);
             var game = command.split('#')[1];
@@ -157,7 +155,7 @@ io.on('connection', socket => {
         if (clientNick) return;
         socket.nick = nick;
         clientNick = nick;
-        logger.info('join', {nick: socket.nick, id: socket.id, ip: ip});
+        logger.info('< join', {nick: socket.nick, id: socket.id, ip: ip});
         //logger.debug('joined', {socket: {nick: socket.nick, id: socket.id}});
         broadcast(socket, 'join', socket.nick);
         redis.hset('weplay:nicks', clientId, nick);
@@ -168,7 +166,7 @@ io.on('connection', socket => {
 
     function broadcast(socket/*, …*/) {
         const args = Array.prototype.slice.call(arguments, 1);
-        //logger.debug('broadcast', {room: currentHash, args: args});
+        logger.debug('broadcast', {room: currentHash, args: args});
         redis.lpush('weplay:log', JSON.stringify(args));
         redis.ltrim('weplay:log', 0, 20);
         io.to(currentHash).emit.apply(io.to(currentHash), args);
@@ -189,7 +187,7 @@ function updateClients(clientId, hash) {
 }
 
 function join(currentHash, socket, clientId) {
-    logger.info('joining', {hash: currentHash, clientId: clientId});
+    logger.debug(`> weplay:join:${currentHash}`, {nick: socket.nick, hash: currentHash, clientId: clientId});
     socket.join(currentHash);
     updateClients(clientId, currentHash);
     redis.publish(`weplay:join:${currentHash}`, clientId);
