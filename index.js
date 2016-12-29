@@ -18,8 +18,12 @@ const uri = process.env.WEPLAY_REDIS || 'redis://localhost:6379';
 
 io.adapter(require('socket.io-redis')(uri));
 
-// redis queries instance
+// redis
 const redis = require('weplay-common').redis();
+const redisSub = require('weplay-common').redis();
+
+const EventBus = require('weplay-common').EventBus;
+const bus = new EventBus(redis, redisSub);
 
 logger.debug('io listening', {port: port, uuid: uuid, adapter: uri});
 
@@ -48,14 +52,12 @@ io.on('connection', socket => {
     const clientId = socket.id;
     clients.push(clientId);
     var clientNick;
-    var defaultHash;
     var currentHash;
     // keep track of connected clients
     updateCount(++io.total);
 
     redis.get('weplay:rom:default', (err, _defaultHash) => {
         if (_defaultHash) {
-            defaultHash = _defaultHash;
             currentHash = _defaultHash.toString();
             join(currentHash, socket, clientId);
         }
@@ -80,11 +82,12 @@ io.on('connection', socket => {
 
     // send events log so far
     redis.lrange('weplay:log', 0, 20, (err, log) => {
-        if (!Array.isArray(log)) return;
+        if (!Array.isArray(log)) {
+            return;
+        }
         log.reverse().forEach(data => {
             data = data.toString();
             const args = JSON.parse(data);
-            //logger.debug('log', {args: args});
             if (Array.isArray(args)) {
                 socket.emit(...args);
             } else {
@@ -95,7 +98,9 @@ io.on('connection', socket => {
 
     // broadcast moves, throttling them first
     socket.on('move', key => {
-        if (null == keys[key]) return;
+        if (null == keys[key]) {
+            return;
+        }
         redis.get(`weplay:move-last:${clientId}`, (err, last) => {
             if (last) {
                 last = last.toString();
@@ -112,13 +117,14 @@ io.on('connection', socket => {
             redis.set(`weplay:move-last:${clientId}`, Date.now());
             redis.expire(`weplay:move-last:${clientId}`, 1);
             redis.publish(`weplay:move:${currentHash}`, keys[key]);
-            //socket.emit('move', key, socket.nick);
             broadcast(socket, 'move', key, socket.nick);
         });
     });
 
     socket.on('command', command => {
-        if (null == command) return;
+        if (null == command) {
+            return;
+        }
         redis.get(`weplay:command-last:${clientId}`, (err, last) => {
             if (last) {
                 last = last.toString();
@@ -152,11 +158,12 @@ io.on('connection', socket => {
 
     // broadcast user joining
     socket.on('join', nick => {
-        if (clientNick) return;
+        if (clientNick) {
+            return;
+        }
         socket.nick = nick;
         clientNick = nick;
         logger.info('< join', {nick: socket.nick, id: socket.id, ip: ip});
-        //logger.debug('joined', {socket: {nick: socket.nick, id: socket.id}});
         broadcast(socket, 'join', socket.nick);
         redis.hset('weplay:nicks', clientId, nick);
         // event done, notify client
@@ -198,9 +205,34 @@ require('weplay-common').cleanup(function destroyData() {
     redis.hdel('weplay:connections', uuid);
     clients.forEach(client=> {
         redis.hdel('weplay:clients', client);
-        //redis.hdel('weplay:nicks', clientId);
     });
     for (var key in clientsHashes) {
-        redis.publish(`weplay:leave:${clientsHashes[key]}`, key);
+        if (clientsHashes.hasOwnProperty(key)) {
+            redis.publish(`weplay:leave:${clientsHashes[key]}`, key);
+        }
     }
+
+    bus.publish('weplay:io:unsubscribe', uuid);
+    bus.destroy();
 });
+
+let loaded = false;
+let retryCount = 0;
+
+bus.subscribe(`weplay:io:${uuid}:subscribe:done`, (channel, id) => {
+    logger.info(`< weplay:io:${uuid}:subscribe:done`, {uuid: id.toString()});
+    loaded = true;
+    retryCount = 0;
+});
+
+function discover() {
+    logger.info('> weplay:io:subscribe', {uuid, retry: retryCount++});
+    bus.publish('weplay:io:subscribe', uuid);
+    setTimeout(() => {
+        if (!loaded) {
+            discover();
+        }
+    }, 10000); //saveIntervalDelay
+}
+
+discover();
