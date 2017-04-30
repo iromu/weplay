@@ -4,14 +4,19 @@
   "description": "collaborative gameboy emulation powered by socket.io – weplay.io",
   "dependencies": {
     "blob": "0.0.4",
+    "fps": "0.0.3",
     "forwarded-for": "1.0.1",
     "node-uuid": "^1.4.7",
-    "socket.io": "1.5.0",
-    "socket.io-redis": "1.1.1",
     "weplay-common": "iromu/weplay-common"
   },
+  "devDependencies": {
+    "jshint": "latest",
+    "watch": "latest"
+  },
   "scripts": {
-    "start": "node index.js"
+    "start": "watch 'node index.js'",
+    "prestart": "npm run lint",
+    "lint": "./node_modules/weplay-common/node_modules/.bin/eslint report ."
   },
   "engines": {
     "node": ">=7.0.0"
