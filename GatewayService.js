@@ -8,7 +8,6 @@ const SocketHandler = require('./SocketHandler')
 const FrameBroker = require('./FrameBroker')
 
 class GatewayService {
-
   constructor(port, discoveryUrl, discoveryPort, redis) {
     const romListeners = new RomListeners()
 
@@ -70,7 +69,6 @@ class GatewayService {
 
     const socketHandler = new SocketHandler(this)
     this.io.on('connection', socketHandler.onConnection.bind(this))
-
   }
 
   init() {
@@ -116,7 +114,7 @@ class GatewayService {
    *
    * Stores user event log data.
    * */
-  broadcastEventLog(socket/*, …*/) {
+  broadcastEventLog(socket) {
     const args = Array.prototype.slice.call(arguments, 1)
     var room = socket.room || this.defaultRomHash
     this.logger.info('GatewayService.broadcast', {room: room, args: args})
@@ -131,6 +129,9 @@ class GatewayService {
   replayEventLog(socket) {
     this.logger.info('GatewayService.replayEventLog', socket.nick)
     this.redis.lrange('weplay:log', 0, 20, (err, log) => {
+      if (err) {
+        this.logger.error(err)
+      }
       if (!Array.isArray(log)) {
         return
       }
@@ -162,6 +163,4 @@ class GatewayService {
     this.bus.destroy()
   }
 }
-
-
 module.exports = GatewayService

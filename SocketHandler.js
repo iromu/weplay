@@ -61,7 +61,10 @@ class SocketHandler {
         return
       }
       var self = this
-      this.redis.get(`weplay:move-last:${clientId}`, function (err, last) {
+      this.redis.get(`weplay:move-last:${clientId}`, (err, last) => {
+        if (err) {
+          self.logger.error(err)
+        }
         if (last) {
           last = last.toString()
           if (Date.now() - last < throttle) {
@@ -87,6 +90,9 @@ class SocketHandler {
         return
       }
       this.redis.get(`weplay:command-last:${clientId}`, (err, last) => {
+        if (err) {
+          this.logger.error(err)
+        }
         if (last) {
           last = last.toString()
           if (Date.now() - last < throttle) {
@@ -103,6 +109,9 @@ class SocketHandler {
         this.redis.expire(`weplay:command-last:${clientId}`, 1)
         var game = command.split('#')[1]
         this.redis.get(`weplay:rom:${game}`, (err, hash) => {
+          if (err) {
+            this.logger.error(err)
+          }
           if (hash) {
             if (this.defaultRomHash) {
               socket.leave(this.defaultRomHash)
