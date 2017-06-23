@@ -3,17 +3,19 @@ const EventBus = require('weplay-common').EventBus
 const sio = require('socket.io')
 const fps = require('fps')
 
+const CompressorListeners = require('./CompressorListeners')
 const RomListeners = require('./RomListeners')
 const SocketHandler = require('./SocketHandler')
 const FrameBroker = require('./FrameBroker')
 
 class GatewayService {
-  constructor(port, discoveryUrl, discoveryPort, redis) {
+  constructor(port, discoveryUrl, discoveryPort, statusPort, redis) {
     const romListeners = new RomListeners()
+    const compressorListeners = new CompressorListeners()
 
     this.uuid = require('node-uuid').v4()
     this.logger = require('weplay-common').logger('weplay-gateway-service', this.uuid)
-
+    this.tickers = {}
     this.ticker = fps({every: 200})
     this.ticker.on('data', framerate => {
       this.logger.info('GatewayService[%s] fps %s', this.uuid, framerate)
@@ -22,35 +24,20 @@ class GatewayService {
     this.roomHashes = []
     this.clients = []
     this.clientsHashes = {}
+    this.roomInfo = {}
 
     this.frameBroker = new FrameBroker()
 
     this.bus = new EventBus({
       url: discoveryUrl,
       port: discoveryPort,
+      statusPort: statusPort,
       name: 'gateway',
       id: this.uuid,
       clientListeners: [
         {name: 'rom', event: 'hash', handler: romListeners.onRomHash.bind(this)},
-        {
-          name: 'compressor',
-          event: 'disconnect',
-          handler: () => {
-            this.logger.info('compressor GatewayService x disconnected from')
-            this.roomHashesQ = this.roomHashes
-            this.roomHashes = []
-          }
-        },
-        {
-          name: 'compressor',
-          event: 'connect',
-          handler: () => {
-            if (this.roomHashesQ) {
-              this.logger.info('compressor GatewayService x reconnect')
-              this.roomHashesQ.forEach(this.startBroadcastingFrames.bind(this))
-            }
-          }
-        }
+        {name: 'compressor', event: 'connect', handler: compressorListeners.onConnect.bind(this)},
+        {name: 'compressor', event: 'disconnect', handler: compressorListeners.onDisconnect.bind(this)}
       ]
     }, () => {
       this.logger.debug('GatewayService connected to discovery server', {
@@ -99,6 +86,7 @@ class GatewayService {
   }
 
   startBroadcastingFrames(room) {
+    this.logger.info('GatewayService.startBroadcastingFrames', room)
     this.frameBroker.startBroadcastingFrames.bind(this)(room)
   }
 
@@ -154,7 +142,7 @@ class GatewayService {
   }
 
   destroy() {
-    this.logger.debug('Destroying data.')
+    this.logger.info('Destroying data.')
     this.redis.hdel('weplay:connections', this.uuid)
     this.clients.forEach(client => {
       this.redis.hdel('weplay:clients', client)

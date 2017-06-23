@@ -57,11 +57,12 @@ class SocketHandler {
 
     // broadcast moves, throttling them first
     socket.on('move', key => {
-      if (!keys[key]) {
+      if (!keys.hasOwnProperty(key)) {
         return
       }
       var self = this
       this.redis.get(`weplay:move-last:${clientId}`, (err, last) => {
+
         if (err) {
           self.logger.error(err)
         }
@@ -81,6 +82,10 @@ class SocketHandler {
         self.redis.set(`weplay:move-last:${clientId}`, Date.now())
         self.redis.expire(`weplay:move-last:${clientId}`, 1)
         self.redis.publish(`weplay:move:${this.defaultRomHash}`, keys[key])
+        // self.bus.emit('emu', 'move', keys[key], this.defaultRomHash)
+        // Send message to emitter through room
+        self.bus.emit({channel: 'emu', room: this.defaultRomHash, event: 'move', data: keys[key]})
+
         self.broadcastEventLog(socket, 'move', key, socket.nick)
       })
     })

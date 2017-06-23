@@ -10,13 +10,18 @@
     "weplay-common": "iromu/weplay-common"
   },
   "devDependencies": {
-    "jshint": "latest",
-    "watch": "latest"
+    "chai": "3.5.0",
+    "istanbul": "0.4.5",
+    "mocha": "3.4.2",
+    "sinon": "2.3.1",
+    "sinon-chai": "2.10.0"
   },
   "scripts": {
     "start": "watch 'node index.js'",
     "prestart": "npm run lint",
-    "lint": "./node_modules/weplay-common/node_modules/.bin/eslint report ."
+    "lint": "./node_modules/weplay-common/node_modules/.bin/eslint report src",
+    "test": "NODE_ENV=test ./node_modules/.bin/istanbul cover ./node_modules/mocha/bin/_mocha",
+    "tdd:mac": "NODE_ENV=test ./node_modules/.bin/mocha -w"
   },
   "engines": {
     "node": ">=7.0.0"

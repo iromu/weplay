@@ -10,5 +10,4 @@ class RomListeners {
     this.hashes.push(hashData)
   }
 }
-
 module.exports = RomListeners
