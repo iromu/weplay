@@ -6,8 +6,8 @@ class CompressorListeners {
     }
   }
 
-  onDisconnect() {
-    this.logger.info('compressor GatewayService x disconnected from')
+  onDisconnect(reason) {
+    this.logger.info('compressor GatewayService x disconnected from', reason)
     this.roomHashesQ = this.roomHashes
     this.roomHashes = []
   }

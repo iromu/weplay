@@ -107,11 +107,12 @@ class GatewayService {
     var room = socket.room || this.defaultRomHash
     this.logger.info('GatewayService.broadcast', {room: room, args: args})
 
+    this.io.to(room).emit.apply(this.io.to(room), args)
+
     this.redis.lpush('weplay:log', JSON.stringify({room: room, args: args}))
     this.redis.ltrim('weplay:log', 0, 20)
 
     // ? this.bus.broadcast('game:nick', {nick: nick, clientId: socket.id});
-    this.io.to(room).emit.apply(this.io.to(room), args)
   }
 
   replayEventLog(socket) {

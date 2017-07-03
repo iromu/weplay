@@ -61,33 +61,33 @@ class SocketHandler {
         return
       }
       var self = this
-      this.redis.get(`weplay:move-last:${clientId}`, (err, last) => {
-
-        if (err) {
-          self.logger.error(err)
-        }
-        if (last) {
-          last = last.toString()
-          if (Date.now() - last < throttle) {
-            return
-          }
-        }
-        self.logger.debug('< weplay:move', {
-          event: 'move',
-          key: keys[key],
-          move: key,
-          socket: {nick: socket.nick, id: socket.id},
-          ip: ip
-        })
-        self.redis.set(`weplay:move-last:${clientId}`, Date.now())
-        self.redis.expire(`weplay:move-last:${clientId}`, 1)
-        self.redis.publish(`weplay:move:${this.defaultRomHash}`, keys[key])
-        // self.bus.emit('emu', 'move', keys[key], this.defaultRomHash)
-        // Send message to emitter through room
-        self.bus.emit({channel: 'emu', room: this.defaultRomHash, event: 'move', data: keys[key]})
-
-        self.broadcastEventLog(socket, 'move', key, socket.nick)
+      // this.redis.get(`weplay:move-last:${clientId}`, (err, last) => {
+      //
+      //   if (err) {
+      //     self.logger.error(err)
+      //   }
+      //   if (last) {
+      //     last = last.toString()
+      //     if (Date.now() - last < throttle) {
+      //       return
+      //     }
+      //   }
+      self.logger.debug('< weplay:move', {
+        event: 'move',
+        key: keys[key],
+        move: key,
+        socket: {nick: socket.nick, id: socket.id},
+        ip: ip
       })
+      // self.redis.set(`weplay:move-last:${clientId}`, Date.now())
+      // self.redis.expire(`weplay:move-last:${clientId}`, 1)
+      // self.redis.publish(`weplay:move:${this.defaultRomHash}`, keys[key])
+      // self.bus.emit('emu', 'move', keys[key], this.defaultRomHash)
+      // Send message to emitter through room
+      self.bus.emit({channel: 'emu', room: this.defaultRomHash, event: 'move', data: keys[key]})
+
+      self.broadcastEventLog(socket, 'move', key, socket.nick)
+      // })
     })
 
     socket.on('command', command => {

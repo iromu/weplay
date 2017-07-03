@@ -4,10 +4,11 @@
   "description": "collaborative gameboy emulation powered by socket.io – weplay.io",
   "dependencies": {
     "blob": "0.0.4",
-    "fps": "0.0.3",
     "forwarded-for": "1.0.1",
+    "fps": "0.0.3",
+    "lodash": "^4.17.4",
     "node-uuid": "^1.4.7",
-    "weplay-common": "iromu/weplay-common"
+    "weplay-common": "iromu/weplay-common#develop"
   },
   "devDependencies": {
     "chai": "3.5.0",
