@@ -148,7 +148,6 @@ class GatewayService {
     this.clients.forEach(client => {
       this.redis.hdel('weplay:clients', client)
     })
-    this.bus.broadcast('weplay:io:unsubscribe', this.uuid)
     this.bus.destroy()
   }
 }
