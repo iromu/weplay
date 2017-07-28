@@ -1,7 +1,3 @@
-const forwarded = require('forwarded-for')
-
-const throttle = process.env.WEPLAY_THROTTLE || 100
-
 const keys = {
   right: 0,
   left: 1,
@@ -20,8 +16,6 @@ class SocketHandler {
   }
 
   onConnection(socket) {
-    const req = socket.request
-    const ip = forwarded(req, req.headers)
     const clientId = socket.id
     this.clients.push(clientId)
     var clientNick
@@ -32,15 +26,11 @@ class SocketHandler {
       this.joinStream(this.defaultRomHash, socket, clientId)
     } else {
       this.bus.emit('rom', 'defaulthash')
-      // if (!this.queue[this.defaultRomHash])this.queue[this.defaultRomHash] = {};
-      // if (!this.queue[this.defaultRomHash].joinStream)this.queue[this.defaultRomHash].joinStream = [];
-      // this.queue[this.defaultRomHash].joinStream.push({socket: socket, clientId: clientId});
-      this.logger.error('On connection found no default hash to join.', {id: socket.id, ip: ip})
+      this.logger.error('On connection found no default hash to join.', {id: socket.id})
     }
 
     socket.on('disconnect', () => {
       this.updateCount(--this.io.total)
-      this.logger.debug('disconnect', {event: 'disconnect', nick: clientNick, id: socket.id, ip: ip})
       this.broadcastEventLog(socket, 'disconnected', clientNick)
       if (this.defaultRomHash) {
         delete this.clientsHashes[clientId]
@@ -61,82 +51,26 @@ class SocketHandler {
         return
       }
       var self = this
-      // this.redis.get(`weplay:move-last:${clientId}`, (err, last) => {
-      //
-      //   if (err) {
-      //     self.logger.error(err)
-      //   }
-      //   if (last) {
-      //     last = last.toString()
-      //     if (Date.now() - last < throttle) {
-      //       return
-      //     }
-      //   }
-      self.logger.debug('< weplay:move', {
-        event: 'move',
-        key: keys[key],
-        move: key,
-        socket: {nick: socket.nick, id: socket.id},
-        ip: ip
-      })
-      // self.redis.set(`weplay:move-last:${clientId}`, Date.now())
-      // self.redis.expire(`weplay:move-last:${clientId}`, 1)
-      // self.redis.publish(`weplay:move:${this.defaultRomHash}`, keys[key])
-      // self.bus.emit('emu', 'move', keys[key], this.defaultRomHash)
       // Send message to emitter through room
       self.bus.emit({channel: 'emu', room: this.defaultRomHash, event: 'move', data: keys[key]})
-
       self.broadcastEventLog(socket, 'move', key, socket.nick)
-      // })
     })
 
     socket.on('command', command => {
       if (!command) {
         return
       }
-      this.redis.get(`weplay:command-last:${clientId}`, (err, last) => {
-        if (err) {
-          this.logger.error(err)
+      var game = parseInt(command.split('#')[1])
+      if (this.roms) {
+        var romGameSelection = this.roms.filter((data) => data.idx === game)[0]
+        if (romGameSelection) {
+          this.joinStream(romGameSelection.hash, socket, clientId)
         }
-        if (last) {
-          last = last.toString()
-          if (Date.now() - last < throttle) {
-            return
-          }
-        }
-        this.logger.debug('< weplay:command', {
-          event: 'command',
-          command: command,
-          socket: {nick: socket.nick, id: socket.id},
-          ip: ip
-        })
-        this.redis.set(`weplay:command-last:${clientId}`, Date.now())
-        this.redis.expire(`weplay:command-last:${clientId}`, 1)
-        var game = command.split('#')[1]
-        this.redis.get(`weplay:rom:${game}`, (err, hash) => {
-          if (err) {
-            this.logger.error(err)
-          }
-          if (hash) {
-            if (this.defaultRomHash) {
-              socket.leave(this.defaultRomHash)
-              this.redis.publish(`weplay:leave:${this.defaultRomHash}`, clientId)
-            }
-            this.defaultRomHash = hash.toString()
-            this.joinStream(this.defaultRomHash, socket, clientId)
-          }
-        })
-      })
+      }
     })
 
     // send chat mesages
     socket.on('message', msg => {
-      this.logger.debug('message', {
-        event: 'message',
-        msg: msg,
-        socket: {nick: socket.nick, id: socket.id},
-        ip: ip
-      })
       this.broadcastEventLog(socket, 'message', msg, socket.nick)
     })
 
@@ -147,15 +81,7 @@ class SocketHandler {
         return
       }
       socket.nick = nick
-      this.logger.debug('User has selected a nick name and can join the chat', {
-        event: 'join',
-        room: socket.room,
-        nick: nick,
-        id: socket.id,
-        ip: ip
-      })
       this.broadcastEventLog(socket, 'join', nick)
-      // this.redis.hset('weplay:nicks', clientId, nick);
       // event done, notify client
       socket.emit('joined')
 

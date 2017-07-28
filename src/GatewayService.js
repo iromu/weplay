@@ -1,7 +1,6 @@
 const EventBus = require('weplay-common').EventBus
 
 const sio = require('socket.io')
-const fps = require('fps')
 
 const CompressorListeners = require('./CompressorListeners')
 const RomListeners = require('./RomListeners')
@@ -16,11 +15,8 @@ class GatewayService {
     this.uuid = require('node-uuid').v4()
     this.logger = require('weplay-common').logger('weplay-gateway-service', this.uuid)
     this.tickers = {}
-    this.ticker = fps({every: 200})
-    this.ticker.on('data', framerate => {
-      this.logger.info('GatewayService[%s] fps %s', this.uuid, framerate)
-    })
-
+    this.hashes = []
+    this.hashesClient = {}
     this.roomHashes = []
     this.clients = []
     this.clientsHashes = {}
@@ -36,6 +32,7 @@ class GatewayService {
       id: this.uuid,
       clientListeners: [
         {name: 'rom', event: 'hash', handler: romListeners.onRomHash.bind(this)},
+        {name: 'rom', event: 'data', handler: romListeners.onRomData.bind(this)},
         {name: 'compressor', event: 'connect', handler: compressorListeners.onConnect.bind(this)},
         {name: 'compressor', event: 'disconnect', handler: compressorListeners.onDisconnect.bind(this)}
       ]
@@ -61,6 +58,7 @@ class GatewayService {
   init() {
     this.logger.info('Emitting', {channel: 'rom', event: 'defaultHash'})
     this.bus.emit('rom', 'defaulthash')
+    this.bus.emit('rom', 'list')
 
     // this.logger.info('Reconnecting to frame streams');
     // this.frameBroker.reconnect.bind(this)();
@@ -73,6 +71,10 @@ class GatewayService {
   }
 
   updateClients(clientId, hash) {
+    if (!this.hashesClient[hash]) {
+      this.hashesClient[hash] = []
+    }
+    this.hashesClient[hash].push(clientId)
     this.clientsHashes[clientId] = hash
     this.redis.hset('weplay:clients', clientId, JSON.stringify({hash: hash, io: this.uuid}))
   }
@@ -91,7 +93,20 @@ class GatewayService {
   }
 
   joinStream(hash, socket, clientId) {
-    this.logger.debug('joinStream', {hash: hash, clientId: clientId})
+    if (hash === this.clientsHashes[clientId]) {
+      return
+    }
+    if (clientId === undefined) {
+      clientId = socket.id
+    }
+    if (this.clientsHashes[clientId]) {
+      if (this.hashesClient[hash]) {
+        this.hashesClient[hash] = this.hashesClient[hash].filter(c => c !== clientId)
+      }
+      socket.leave(this.clientsHashes[clientId])
+    }
+
+    // this.logger.debug('joinStream', {hash: hash, clientId: clientId})
     socket.join(hash)
     socket.room = hash
     this.frameBroker.startBroadcastingFrames.bind(this)(hash)
@@ -105,18 +120,12 @@ class GatewayService {
   broadcastEventLog(socket) {
     const args = Array.prototype.slice.call(arguments, 1)
     var room = socket.room || this.defaultRomHash
-    this.logger.info('GatewayService.broadcast', {room: room, args: args})
-
     this.io.to(room).emit.apply(this.io.to(room), args)
-
     this.redis.lpush('weplay:log', JSON.stringify({room: room, args: args}))
     this.redis.ltrim('weplay:log', 0, 20)
-
-    // ? this.bus.broadcast('game:nick', {nick: nick, clientId: socket.id});
   }
 
   replayEventLog(socket) {
-    this.logger.info('GatewayService.replayEventLog', socket.nick)
     this.redis.lrange('weplay:log', 0, 20, (err, log) => {
       if (err) {
         this.logger.error(err)
@@ -151,4 +160,5 @@ class GatewayService {
     this.bus.destroy()
   }
 }
+
 module.exports = GatewayService

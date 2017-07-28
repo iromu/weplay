@@ -9,5 +9,13 @@ class RomListeners {
     }
     this.hashes.push(hashData)
   }
+
+  onRomData(romData) {
+    this.logger.info('RomListeners.onRomHash', romData)
+    if (!this.roms) {
+      this.roms = []
+    }
+    this.roms.push(romData)
+  }
 }
 module.exports = RomListeners
