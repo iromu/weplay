@@ -13,26 +13,35 @@ class FrameBroker {
 
   startBroadcastingFrames(room) {
     if (room && !this.roomHashes.includes(room)) {
-      this.tickers[room] = fps({every: 10})
+      this.logger.info('FrameBroker[%s] startBroadcastingFrames INIT', room)
+      this.roomHashes.push(room)
+      if (!this.tickers[room]) {
+        this.logger.info('FrameBroker.startBroadcastingFrames tickers', room)
+        this.tickers[room] = fps({every: 200})
+        this.tickers[room].on('data', framerate => {
+          this.logger.info('FrameBroker[%s] fps %s', room, Math.floor(framerate))
+        })
+      }
       this.roomInfo[room] = {}
-      this.tickers[room].on('data', framerate => {
-        var hashesClientInfo = {}
-        for (var property in this.hashesClient) {
-          if (this.hashesClient.hasOwnProperty(property)) {
-            hashesClientInfo[property] = this.hashesClient[property].length
-          }
-        }
-        this.logger.info('FrameBroker[%s] fps %s %s', room, Math.floor(framerate), JSON.stringify(hashesClientInfo))
-      })
-      this.logger.info('FrameBroker.startBroadcastingFrames', room)
       this.bus.streamJoin('compressor', room, 'frame', (frame) => {
-        this.tickers[room].tick()
+        if (this.tickers[room]) {
+          this.tickers[room].tick()
+        }
         this.io.to(room).emit('frame', frame)
       })
       this.bus.streamJoin('emu', room, 'move', (move) => {
         this.logger.info('FrameBroker[%s] move %s', room, move)
       })
-      this.roomHashes.push(room)
+    }
+  }
+
+  stopBroadcastingFrames(room) {
+    if (room && this.roomHashes.includes(room)) {
+      this.roomHashes = this.roomHashes.filter(r => r !== room)
+      delete this.hashesClient[room]
+      delete this.tickers[room]
+      this.bus.streamLeave('compressor', room)
+      this.bus.streamLeave('emu', room)
     }
   }
 }

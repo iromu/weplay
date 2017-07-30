@@ -32,13 +32,13 @@ class SocketHandler {
     socket.on('disconnect', () => {
       this.updateCount(--this.io.total)
       this.broadcastEventLog(socket, 'disconnected', clientNick)
-      if (this.defaultRomHash) {
-        delete this.clientsHashes[clientId]
-        this.redis.publish(`weplay:leave:${this.defaultRomHash}`, clientId)
+
+      this.removeClient(clientId, clientNick)
+
+      if (this.redis) {
+        this.redis.hdel('weplay:clients', clientId)
+        this.redis.hdel('weplay:nicks', clientId)
       }
-      this.redis.hdel('weplay:clients', clientId)
-      this.redis.hdel('weplay:nicks', clientId)
-      this.clients = this.clients.filter(item => item !== clientNick)
       clientNick = undefined
     })
 

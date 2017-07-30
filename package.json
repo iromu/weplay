@@ -7,6 +7,7 @@
     "forwarded-for": "1.0.1",
     "fps": "0.0.3",
     "lodash": "^4.17.4",
+    "memwatch-next": "^0.3.0",
     "node-uuid": "^1.4.7",
     "weplay-common": "iromu/weplay-common#develop"
   },

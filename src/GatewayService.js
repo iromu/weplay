@@ -1,11 +1,14 @@
 const EventBus = require('weplay-common').EventBus
 
 const sio = require('socket.io')
+const memwatch = require('memwatch-next')
 
 const CompressorListeners = require('./CompressorListeners')
 const RomListeners = require('./RomListeners')
 const SocketHandler = require('./SocketHandler')
 const FrameBroker = require('./FrameBroker')
+
+const CHECK_INTERVAL = 10000
 
 class GatewayService {
   constructor(port, discoveryUrl, discoveryPort, statusPort, redis) {
@@ -22,6 +25,12 @@ class GatewayService {
     this.clientsHashes = {}
     this.roomInfo = {}
 
+    memwatch.on('stats', (stats) => {
+      this.logger.info('stats', stats)
+    })
+    memwatch.on('leak', (info) => {
+      this.logger.error('leak', info)
+    })
     this.frameBroker = new FrameBroker()
 
     this.bus = new EventBus({
@@ -44,6 +53,15 @@ class GatewayService {
       this.init()
     })
 
+    if (this.checkInterval) {
+      clearInterval(this.checkInterval)
+      this.checkInterval = undefined
+    }
+
+    this.checkInterval = setInterval(() => {
+      this.check()
+    }, CHECK_INTERVAL)
+
     this.redis = redis
     this.io = module.exports = sio(port)
     // redis socket.io adapter
@@ -59,7 +77,9 @@ class GatewayService {
     this.logger.info('Emitting', {channel: 'rom', event: 'defaultHash'})
     this.bus.emit('rom', 'defaulthash')
     this.bus.emit('rom', 'list')
-
+    // this.roomHashesQ = this.roomHashes
+    // this.roomHashes = []
+    // this.roomHashesQ.forEach(this.startBroadcastingFrames.bind(this))
     // this.logger.info('Reconnecting to frame streams');
     // this.frameBroker.reconnect.bind(this)();
   }
@@ -70,13 +90,57 @@ class GatewayService {
     this.redis.hset('weplay:connections', this.uuid, total)
   }
 
+  check() {
+    var hashesClientInfo = {}
+    for (var property in this.hashesClient) {
+      if (this.hashesClient.hasOwnProperty(property)) {
+        hashesClientInfo[property] = this.hashesClient[property].length
+        if (this.hashesClient[property].length === 0) {
+          delete this.hashesClient[property]
+        }
+      }
+    }
+    this.logger.info('GatewayService.check hashesClientInfo', hashesClientInfo)
+    this.roomHashes.forEach(room => {
+      if (this.hashesClient[room] === undefined) {
+        this.frameBroker.stopBroadcastingFrames.bind(this)(room)
+      }
+    })
+  }
+
   updateClients(clientId, hash) {
+    // Purge client from all caches
+    for (var h in this.hashesClient) {
+      if (this.hashesClient.hasOwnProperty(h)) {
+        this.hashesClient[h] = this.hashesClient[h].filter(c => c !== clientId)
+        if (this.hashesClient[h].length === 0) {
+          delete this.hashesClient[h]
+        }
+      }
+    }
+    // Create if empty
     if (!this.hashesClient[hash]) {
       this.hashesClient[hash] = []
     }
+    // Add client to hash
     this.hashesClient[hash].push(clientId)
     this.clientsHashes[clientId] = hash
     this.redis.hset('weplay:clients', clientId, JSON.stringify({hash: hash, io: this.uuid}))
+  }
+
+  removeClient(clientId, clientNick) {
+    delete this.clientsHashes[clientId]
+    for (var hash in this.hashesClient) {
+      if (this.hashesClient.hasOwnProperty(hash)) {
+        this.hashesClient[hash] = this.hashesClient[hash].filter(c => c !== clientId)
+        if (this.hashesClient[hash].length === 0) {
+          delete this.hashesClient[hash]
+        }
+      }
+    }
+    if (clientNick) {
+      this.clients = this.clients.filter(item => item !== clientNick)
+    }
   }
 
   onFrame(frame) {
@@ -93,22 +157,23 @@ class GatewayService {
   }
 
   joinStream(hash, socket, clientId) {
+    clientId = clientId === undefined ? socket.id : clientId
+    // Already joined ?
     if (hash === this.clientsHashes[clientId]) {
       return
     }
-    if (clientId === undefined) {
-      clientId = socket.id
-    }
-    if (this.clientsHashes[clientId]) {
-      if (this.hashesClient[hash]) {
-        this.hashesClient[hash] = this.hashesClient[hash].filter(c => c !== clientId)
-      }
+    if (socket.room) {
+      socket.leave(socket.room)
+    } else if (this.clientsHashes[clientId]) {
       socket.leave(this.clientsHashes[clientId])
     }
-
+    if (this.hashesClient[hash]) {
+      this.hashesClient[hash] = this.hashesClient[hash].filter(c => c !== clientId)
+    }
     // this.logger.debug('joinStream', {hash: hash, clientId: clientId})
     socket.join(hash)
     socket.room = hash
+    this.clientsHashes[clientId] = hash
     this.frameBroker.startBroadcastingFrames.bind(this)(hash)
     this.updateClients(clientId, hash)
   }
