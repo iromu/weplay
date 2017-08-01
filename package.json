@@ -9,14 +9,14 @@
     "lodash": "^4.17.4",
     "memwatch-next": "^0.3.0",
     "node-uuid": "^1.4.7",
-    "weplay-common": "iromu/weplay-common#develop"
+    "weplay-common": "github:iromu/weplay-common#develop"
   },
   "devDependencies": {
-    "chai": "3.5.0",
+    "chai": "4.1.0",
     "istanbul": "0.4.5",
-    "mocha": "3.4.2",
-    "sinon": "2.3.1",
-    "sinon-chai": "2.10.0"
+    "mocha": "3.5.0",
+    "sinon": "2.4.1",
+    "sinon-chai": "2.12.0"
   },
   "scripts": {
     "start": "watch 'node index.js'",
