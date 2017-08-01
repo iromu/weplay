@@ -20,6 +20,7 @@ class GatewayService {
     this.tickers = {}
     this.hashes = []
     this.hashesClient = {}
+    this.roomsTimestamp = {}
     this.roomHashes = []
     this.clients = []
     this.clientsHashes = {}
@@ -59,7 +60,7 @@ class GatewayService {
     }
 
     this.checkInterval = setInterval(() => {
-      this.check()
+      this.gc()
     }, CHECK_INTERVAL)
 
     this.redis = redis
@@ -80,8 +81,8 @@ class GatewayService {
     // this.roomHashesQ = this.roomHashes
     // this.roomHashes = []
     // this.roomHashesQ.forEach(this.startBroadcastingFrames.bind(this))
-    // this.logger.info('Reconnecting to frame streams');
-    // this.frameBroker.reconnect.bind(this)();
+    this.logger.info('Reconnecting to frame streams')
+    this.frameBroker.reconnect.bind(this)()
   }
 
 // sends connections count to everyone
@@ -90,7 +91,7 @@ class GatewayService {
     this.redis.hset('weplay:connections', this.uuid, total)
   }
 
-  check() {
+  gc() {
     var hashesClientInfo = {}
     for (var property in this.hashesClient) {
       if (this.hashesClient.hasOwnProperty(property)) {
@@ -106,6 +107,11 @@ class GatewayService {
         this.frameBroker.stopBroadcastingFrames.bind(this)(room)
       }
     })
+
+    this.logger.info('GatewayService.check roomsTimestamp', this.roomsTimestamp)
+    for (var room in this.roomsTimestamp) {
+      this.frameBroker.startBroadcastingFrames.bind(this)(room)
+    }
   }
 
   updateClients(clientId, hash) {
@@ -153,6 +159,7 @@ class GatewayService {
 
   startBroadcastingFrames(room) {
     this.logger.info('GatewayService.startBroadcastingFrames', room)
+    this.gc()
     this.frameBroker.startBroadcastingFrames.bind(this)(room)
   }
 
@@ -162,9 +169,7 @@ class GatewayService {
     if (hash === this.clientsHashes[clientId]) {
       return
     }
-    if (socket.room) {
-      socket.leave(socket.room)
-    } else if (this.clientsHashes[clientId]) {
+    if (this.clientsHashes[clientId]) {
       socket.leave(this.clientsHashes[clientId])
     }
     if (this.hashesClient[hash]) {

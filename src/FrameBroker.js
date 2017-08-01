@@ -4,10 +4,12 @@ class FrameBroker {
   reconnect() {
     this.roomHashes.forEach(room => {
       this.logger.info('FrameBroker.reconnect', room)
-      this.bus.streamJoin('compressor', room, 'frame', (frame) => {
-        this.ticker.tick()
-        this.io.to(room).emit('frame', frame)
-      })
+      // this.bus.streamJoin('compressor', room, 'frame', (frame) => {
+      //   if (this.tickers[room]) {
+      //     this.tickers[room].tick()
+      //   }
+      //   this.io.to(room).emit('frame', frame)
+      // })
     })
   }
 
@@ -15,11 +17,12 @@ class FrameBroker {
     if (room && !this.roomHashes.includes(room)) {
       this.logger.info('FrameBroker[%s] startBroadcastingFrames INIT', room)
       this.roomHashes.push(room)
-      if (!this.tickers[room]) {
+      if (this.tickers[room] === undefined) {
         this.logger.info('FrameBroker.startBroadcastingFrames tickers', room)
         this.tickers[room] = fps({every: 200})
         this.tickers[room].on('data', framerate => {
           this.logger.info('FrameBroker[%s] fps %s', room, Math.floor(framerate))
+          this.roomsTimestamp[room] = Date.now()
         })
       }
       this.roomInfo[room] = {}
@@ -29,6 +32,7 @@ class FrameBroker {
         }
         this.io.to(room).emit('frame', frame)
       })
+
       this.bus.streamJoin('emu', room, 'move', (move) => {
         this.logger.info('FrameBroker[%s] move %s', room, move)
       })
@@ -40,6 +44,7 @@ class FrameBroker {
       this.roomHashes = this.roomHashes.filter(r => r !== room)
       delete this.hashesClient[room]
       delete this.tickers[room]
+      delete this.roomsTimestamp[room]
       this.bus.streamLeave('compressor', room)
       this.bus.streamLeave('emu', room)
     }
