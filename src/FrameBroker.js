@@ -17,19 +17,24 @@ class FrameBroker {
     if (room && !this.roomHashes.includes(room)) {
       this.logger.info('FrameBroker[%s] startBroadcastingFrames INIT', room)
       this.roomHashes.push(room)
-      if (this.tickers[room] === undefined) {
+      this.roomsTimestamp[room] = Date.now()
+      if (!this.tickers[room]) {
         this.logger.info('FrameBroker.startBroadcastingFrames tickers', room)
-        this.tickers[room] = fps({every: 200})
-        this.tickers[room].on('data', framerate => {
-          this.logger.info('FrameBroker[%s] fps %s', room, Math.floor(framerate))
-          this.roomsTimestamp[room] = Date.now()
-        })
+        this.tickers[room] = fps({every: 60})
+        const listener = (framerate) => {
+          this.logger.info('FrameBroker[%s] fps %s %s', room, Math.floor(framerate), this.tickers[room].listenerCount('data'))
+        }
+        this.tickers[room].removeListener('data', listener)
+        this.tickers[room].on('data', listener)
       }
       this.roomInfo[room] = {}
       this.bus.streamJoin('compressor', room, 'frame', (frame) => {
         if (this.tickers[room]) {
           this.tickers[room].tick()
         }
+        this.roomsTimestamp[room] = Date.now()
+        // broadcast frames to users
+        this.lastFrameByRoom[room] = frame
         this.io.to(room).emit('frame', frame)
       })
 
@@ -43,7 +48,10 @@ class FrameBroker {
     if (room && this.roomHashes.includes(room)) {
       this.roomHashes = this.roomHashes.filter(r => r !== room)
       delete this.hashesClient[room]
-      delete this.tickers[room]
+      if (this.tickers[room]) {
+        this.tickers[room].removeAllListeners('data')
+        delete this.tickers[room]
+      }
       delete this.roomsTimestamp[room]
       this.bus.streamLeave('compressor', room)
       this.bus.streamLeave('emu', room)

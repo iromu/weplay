@@ -2,22 +2,26 @@ const EventBus = require('weplay-common').EventBus
 
 const sio = require('socket.io')
 const memwatch = require('memwatch-next')
+const fs = require('fs')
+const join = require('path').join
 
 const CompressorListeners = require('./CompressorListeners')
 const RomListeners = require('./RomListeners')
 const SocketHandler = require('./SocketHandler')
 const FrameBroker = require('./FrameBroker')
 
-const CHECK_INTERVAL = 10000
+const CHECK_INTERVAL = 5000
 
 class GatewayService {
   constructor(port, discoveryUrl, discoveryPort, statusPort, redis) {
     const romListeners = new RomListeners()
     const compressorListeners = new CompressorListeners()
 
+    this.NO_CONN_FRAME = fs.readFileSync(join(process.cwd(), 'src', 'no-conn.png'))
     this.uuid = require('node-uuid').v4()
     this.logger = require('weplay-common').logger('weplay-gateway-service', this.uuid)
     this.tickers = {}
+    this.lastFrameByRoom = {}
     this.hashes = []
     this.hashesClient = {}
     this.roomsTimestamp = {}
@@ -44,6 +48,7 @@ class GatewayService {
         {name: 'rom', event: 'hash', handler: romListeners.onRomHash.bind(this)},
         {name: 'rom', event: 'data', handler: romListeners.onRomData.bind(this)},
         {name: 'compressor', event: 'connect', handler: compressorListeners.onConnect.bind(this)},
+        {name: 'compressor', event: 'streamRejected', handler: compressorListeners.onStreamRejected.bind(this)},
         {name: 'compressor', event: 'disconnect', handler: compressorListeners.onDisconnect.bind(this)}
       ]
     }, () => {
@@ -85,8 +90,6 @@ class GatewayService {
     this.frameBroker.reconnect.bind(this)()
   }
 
-// sends connections count to everyone
-// by aggregating all servers
   updateCount(total) {
     this.redis.hset('weplay:connections', this.uuid, total)
   }
@@ -103,15 +106,30 @@ class GatewayService {
     }
     this.logger.info('GatewayService.check hashesClientInfo', hashesClientInfo)
     this.roomHashes.forEach(room => {
-      if (this.hashesClient[room] === undefined) {
+      if (!this.hashesClient[room]) {
+        if (this.tickers[room]) {
+          this.tickers[room].removeAllListeners('data')
+          delete this.tickers[room]
+        }
+        this.io.to(room).emit('frame', this.NO_CONN_FRAME)
         this.frameBroker.stopBroadcastingFrames.bind(this)(room)
       }
     })
 
     this.logger.info('GatewayService.check roomsTimestamp', this.roomsTimestamp)
     for (var room in this.roomsTimestamp) {
-      this.frameBroker.startBroadcastingFrames.bind(this)(room)
+      if (this.isOlderThan(this.roomsTimestamp[room], CHECK_INTERVAL)) {
+        this.logger.error('GatewayService.check STARTING DEAD', room)
+        this.tickers[room] && this.tickers[room].removeAllListeners('data')
+        delete this.tickers[room]
+        this.roomHashes = this.roomHashes.filter(r => r !== room)
+        this.frameBroker.startBroadcastingFrames.bind(this)(room)
+      }
     }
+  }
+
+  isOlderThan(ts, limit) {
+    return Date.now() - ts > limit
   }
 
   updateClients(clientId, hash) {
@@ -164,6 +182,10 @@ class GatewayService {
   }
 
   joinStream(hash, socket, clientId) {
+    if (this.lastFrameByRoom[hash]) {
+      socket.emit('frame', this.lastFrameByRoom[hash])
+    }
+
     clientId = clientId === undefined ? socket.id : clientId
     // Already joined ?
     if (hash === this.clientsHashes[clientId]) {
