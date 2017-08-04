@@ -28,7 +28,7 @@ class FrameBroker {
         this.tickers[room].on('data', listener)
       }
       this.roomInfo[room] = {}
-      this.bus.streamJoin('compressor', room, 'frame', (frame) => {
+      this.bus.streamJoin('compressor', room, 'frame' + room, (frame) => {
         if (this.tickers[room]) {
           this.tickers[room].tick()
         }
@@ -38,9 +38,9 @@ class FrameBroker {
         this.io.to(room).emit('frame', frame)
       })
 
-      this.bus.streamJoin('emu', room, 'move', (move) => {
-        this.logger.info('FrameBroker[%s] move %s', room, move)
-      })
+      // this.bus.streamJoin('emu', room, 'move' + room, (move) => {
+      //   this.logger.info('FrameBroker[%s] move %s', room, move)
+      // })
     }
   }
 
@@ -54,7 +54,7 @@ class FrameBroker {
       }
       delete this.roomsTimestamp[room]
       this.bus.streamLeave('compressor', room)
-      this.bus.streamLeave('emu', room)
+      // this.bus.streamLeave('emu', room)
     }
   }
 }

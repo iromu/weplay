@@ -14,8 +14,6 @@ class CompressorListeners {
 
   onStreamRejected(room) {
     this.logger.info('CompressorListeners.onStreamRejected', room)
-
-    this.lastFrameByRoom[room] = this.NO_CONN_FRAME
     this.io.to(room).emit('frame', this.NO_CONN_FRAME)
     // This will trigger a reconnection attempt
     // this.roomHashes = this.roomHashes.filter(r => r !== room)

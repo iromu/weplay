@@ -10,7 +10,7 @@ const RomListeners = require('./RomListeners')
 const SocketHandler = require('./SocketHandler')
 const FrameBroker = require('./FrameBroker')
 
-const CHECK_INTERVAL = 5000
+const CHECK_INTERVAL = 2000
 
 class GatewayService {
   constructor(port, discoveryUrl, discoveryPort, statusPort, redis) {
@@ -104,7 +104,7 @@ class GatewayService {
         }
       }
     }
-    this.logger.info('GatewayService.check hashesClientInfo', hashesClientInfo)
+    // this.logger.info('GatewayService.check hashesClientInfo', hashesClientInfo)
     this.roomHashes.forEach(room => {
       if (!this.hashesClient[room]) {
         if (this.tickers[room]) {
@@ -116,7 +116,7 @@ class GatewayService {
       }
     })
 
-    this.logger.info('GatewayService.check roomsTimestamp', this.roomsTimestamp)
+    // this.logger.info('GatewayService.check roomsTimestamp', this.roomsTimestamp)
     for (var room in this.roomsTimestamp) {
       if (this.isOlderThan(this.roomsTimestamp[room], CHECK_INTERVAL)) {
         this.logger.error('GatewayService.check STARTING DEAD', room)
@@ -124,6 +124,7 @@ class GatewayService {
         delete this.tickers[room]
         this.roomHashes = this.roomHashes.filter(r => r !== room)
         this.frameBroker.startBroadcastingFrames.bind(this)(room)
+        delete this.roomsTimestamp[room]
       }
     }
   }
@@ -182,10 +183,6 @@ class GatewayService {
   }
 
   joinStream(hash, socket, clientId) {
-    if (this.lastFrameByRoom[hash]) {
-      socket.emit('frame', this.lastFrameByRoom[hash])
-    }
-
     clientId = clientId === undefined ? socket.id : clientId
     // Already joined ?
     if (hash === this.clientsHashes[clientId]) {
@@ -199,6 +196,9 @@ class GatewayService {
     }
     // this.logger.debug('joinStream', {hash: hash, clientId: clientId})
     socket.join(hash)
+    if (this.lastFrameByRoom[hash]) {
+      socket.emit('frame', this.lastFrameByRoom[hash])
+    }
     socket.room = hash
     this.clientsHashes[clientId] = hash
     this.frameBroker.startBroadcastingFrames.bind(this)(hash)
