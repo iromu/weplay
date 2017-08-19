@@ -18,11 +18,12 @@ class GatewayService {
     const compressorListeners = new CompressorListeners()
 
     this.NO_CONN_FRAME = fs.readFileSync(join(process.cwd(), 'src', 'no-conn.png'))
-    this.uuid = require('node-uuid').v4()
+    this.uuid = require('uuid/v1')()
     this.logger = require('weplay-common').logger('weplay-gateway-service', this.uuid)
     this.tickers = {}
     this.lastFrameByRoom = {}
     this.hashes = []
+    this.roms = []
     this.hashesClient = {}
     this.roomsTimestamp = {}
     this.roomHashes = []
@@ -45,8 +46,10 @@ class GatewayService {
       name: 'gateway',
       id: this.uuid,
       clientListeners: [
+        {name: 'rom', event: 'connect', handler: romListeners.onConnect.bind(this)},
         {name: 'rom', event: 'hash', handler: romListeners.onRomHash.bind(this)},
         {name: 'rom', event: 'data', handler: romListeners.onRomData.bind(this)},
+        {name: 'rom', event: 'image', handler: romListeners.onRomImage.bind(this)},
         {name: 'compressor', event: 'connect', handler: compressorListeners.onConnect.bind(this)},
         {name: 'compressor', event: 'streamRejected', handler: compressorListeners.onStreamRejected.bind(this)},
         {name: 'compressor', event: 'disconnect', handler: compressorListeners.onDisconnect.bind(this)}
@@ -111,7 +114,6 @@ class GatewayService {
           this.tickers[room].removeAllListeners('data')
           delete this.tickers[room]
         }
-        this.io.to(room).emit('frame', this.NO_CONN_FRAME)
         this.frameBroker.stopBroadcastingFrames.bind(this)(room)
       }
     })
@@ -184,23 +186,30 @@ class GatewayService {
 
   joinStream(hash, socket, clientId) {
     clientId = clientId === undefined ? socket.id : clientId
+
     // Already joined ?
     if (hash === this.clientsHashes[clientId]) {
       return
     }
     if (this.clientsHashes[clientId]) {
       socket.leave(this.clientsHashes[clientId])
+      this.removeClient(clientId)
+      this.gc()
     }
+    this.clientsHashes[clientId] = hash
     if (this.hashesClient[hash]) {
       this.hashesClient[hash] = this.hashesClient[hash].filter(c => c !== clientId)
     }
     // this.logger.debug('joinStream', {hash: hash, clientId: clientId})
     socket.join(hash)
+    if (this.roms.filter(r => r.hash === hash)[0].image) {
+      socket.emit('frame', this.roms.filter(r => r.hash === hash)[0].image)
+    }
     if (this.lastFrameByRoom[hash]) {
       socket.emit('frame', this.lastFrameByRoom[hash])
     }
     socket.room = hash
-    this.clientsHashes[clientId] = hash
+    // this.clientsHashes[clientId] = hash
     this.frameBroker.startBroadcastingFrames.bind(this)(hash)
     this.updateClients(clientId, hash)
   }

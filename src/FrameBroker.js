@@ -20,7 +20,7 @@ class FrameBroker {
       this.roomsTimestamp[room] = Date.now()
       if (!this.tickers[room]) {
         this.logger.info('FrameBroker.startBroadcastingFrames tickers', room)
-        this.tickers[room] = fps({every: 60})
+        this.tickers[room] = fps({every: 200})
         const listener = (framerate) => {
           this.logger.info('FrameBroker[%s] fps %s %s', room, Math.floor(framerate), this.tickers[room].listenerCount('data'))
         }

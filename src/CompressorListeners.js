@@ -14,7 +14,11 @@ class CompressorListeners {
 
   onStreamRejected(room) {
     this.logger.info('CompressorListeners.onStreamRejected', room)
-    this.io.to(room).emit('frame', this.NO_CONN_FRAME)
+    if (this.roms.filter(r => r.hash === room)[0].image) {
+      this.io.to(room).emit('frame', this.roms.filter(r => r.hash === room)[0].image)
+    } else {
+      this.io.to(room).emit('frame', this.NO_CONN_FRAME)
+    }
     // This will trigger a reconnection attempt
     // this.roomHashes = this.roomHashes.filter(r => r !== room)
     this.tickers[room] && this.tickers[room].removeAllListeners('data')

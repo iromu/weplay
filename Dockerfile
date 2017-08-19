@@ -1,4 +1,4 @@
-FROM node:8
+FROM iromu/weplay-common:latest
 
 # Create app directory
 RUN mkdir -p /usr/src/app/io
@@ -7,8 +7,8 @@ WORKDIR /usr/src/app/io
 COPY . .
 
 # Install app dependencies
-RUN npm install
-
+RUN yarn --production
+RUN yarn link weplay-common
 # Setup environment
 ENV NODE_ENV production
 ENV WEPLAY_PORT 8081
