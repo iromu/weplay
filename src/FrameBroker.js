@@ -37,7 +37,7 @@ class FrameBroker {
         this.lastFrameByRoom[room] = frame
         this.io.to(room).emit('frame', frame)
       })
-      this.bus.streamJoin('emu', room, 'audio' + room, (audio) => {
+      this.bus.streamJoin('compressor', room, 'audio' + room, (audio) => {
         this.roomsTimestamp[room] = Date.now()
         this.io.to(room).emit('audio', audio)
       })
@@ -58,8 +58,6 @@ class FrameBroker {
       }
       delete this.roomsTimestamp[room]
       this.bus.streamLeave('compressor', room)
-      this.bus.streamLeave('emu', room)
-      // this.bus.streamLeave('emu', room)
     }
   }
 }
