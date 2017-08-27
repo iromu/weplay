@@ -1,3 +1,5 @@
+import GatewayService from './GatewayService'
+
 process.title = 'weplay-gateway'
 
 const discoveryUrl = process.env.DISCOVERY_URL || 'http://localhost:3010'
@@ -7,7 +9,6 @@ const statusPort = process.env.STATUS_PORT || 8084
 
 const redis = require('weplay-common').redis()
 
-const GatewayService = require('./src/GatewayService')
 const service = new GatewayService(port, discoveryUrl, discoveryPort, statusPort, redis)
 
 require('weplay-common').cleanup(service.destroy.bind(service))

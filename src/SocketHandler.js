@@ -18,7 +18,7 @@ class SocketHandler {
   onConnection(socket) {
     const clientId = socket.id
     this.clients.push(clientId)
-    var clientNick
+    let clientNick
     // keep track of connected clients
     this.updateCount(++this.io.total)
     if (this.defaultRomHash) {
@@ -50,7 +50,7 @@ class SocketHandler {
       if (!keys.hasOwnProperty(key)) {
         return
       }
-      var self = this
+      const self = this
       // Send message to emitter through room
       self.bus.emit({channel: 'emu', room: this.defaultRomHash, event: 'move', data: keys[key]})
       self.broadcastEventLog(socket, 'move', key, socket.nick)
@@ -60,9 +60,9 @@ class SocketHandler {
       if (!command) {
         return
       }
-      var game = parseInt(command.split('#')[1])
+      const game = parseInt(command.split('#')[1])
       if (this.roms) {
-        var romGameSelection = this.roms.filter((data) => data.idx === game)[0]
+        const romGameSelection = this.roms.filter((data) => data.idx === game)[0]
         if (romGameSelection) {
           this.joinStream(romGameSelection.hash, socket, clientId)
         }
@@ -87,9 +87,9 @@ class SocketHandler {
 
       // All services gets the event
       // no impl TODO
-      this.bus.broadcast('game:nick', {nick: nick, clientId: socket.id})
+      this.bus.broadcast('game:nick', {nick, clientId: socket.id})
     })
   }
 }
 
-module.exports = SocketHandler
+export default SocketHandler

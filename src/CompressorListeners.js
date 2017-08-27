@@ -26,4 +26,4 @@ class CompressorListeners {
   }
 }
 
-module.exports = CompressorListeners
+export default CompressorListeners

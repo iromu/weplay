@@ -1,14 +1,12 @@
-const EventBus = require('weplay-common').EventBus
-
-const sio = require('socket.io')
-const memwatch = require('memwatch-next')
-const fs = require('fs')
-const join = require('path').join
-
-const CompressorListeners = require('./CompressorListeners')
-const RomListeners = require('./RomListeners')
-const SocketHandler = require('./SocketHandler')
-const FrameBroker = require('./FrameBroker')
+import {EventBus, LoggerFactory} from 'weplay-common'
+import sio from 'socket.io'
+import memwatch from 'memwatch-next'
+import fs from 'fs'
+import {join} from 'path'
+import CompressorListeners from './CompressorListeners'
+import RomListeners from './RomListeners'
+import SocketHandler from './SocketHandler'
+import FrameBroker from './FrameBroker'
 
 const CHECK_INTERVAL = 2000
 
@@ -19,7 +17,7 @@ class GatewayService {
 
     this.NO_CONN_FRAME = fs.readFileSync(join(process.cwd(), 'src', 'no-conn.png'))
     this.uuid = require('uuid/v1')()
-    this.logger = require('weplay-common').logger('weplay-gateway-service', this.uuid)
+    this.logger = LoggerFactory.get('weplay-gateway-service', this.uuid)
     this.tickers = {}
     this.lastFrameByRoom = {}
     this.hashes = []
@@ -42,7 +40,7 @@ class GatewayService {
     this.bus = new EventBus({
       url: discoveryUrl,
       port: discoveryPort,
-      statusPort: statusPort,
+      statusPort,
       name: 'gateway',
       id: this.uuid,
       clientListeners: [
@@ -56,7 +54,7 @@ class GatewayService {
       ]
     }, () => {
       this.logger.debug('GatewayService connected to discovery server', {
-        discoveryUrl: discoveryUrl,
+        discoveryUrl,
         uuid: this.uuid
       })
       this.init()
@@ -98,8 +96,8 @@ class GatewayService {
   }
 
   gc() {
-    var hashesClientInfo = {}
-    for (var property in this.hashesClient) {
+    const hashesClientInfo = {}
+    for (const property in this.hashesClient) {
       if (this.hashesClient.hasOwnProperty(property)) {
         hashesClientInfo[property] = this.hashesClient[property].length
         if (this.hashesClient[property].length === 0) {
@@ -119,7 +117,7 @@ class GatewayService {
     })
 
     // this.logger.info('GatewayService.check roomsTimestamp', this.roomsTimestamp)
-    for (var room in this.roomsTimestamp) {
+    for (const room in this.roomsTimestamp) {
       if (this.isOlderThan(this.roomsTimestamp[room], CHECK_INTERVAL)) {
         this.logger.error('GatewayService.check STARTING DEAD', room)
         this.tickers[room] && this.tickers[room].removeAllListeners('data')
@@ -137,7 +135,7 @@ class GatewayService {
 
   updateClients(clientId, hash) {
     // Purge client from all caches
-    for (var h in this.hashesClient) {
+    for (const h in this.hashesClient) {
       if (this.hashesClient.hasOwnProperty(h)) {
         this.hashesClient[h] = this.hashesClient[h].filter(c => c !== clientId)
         if (this.hashesClient[h].length === 0) {
@@ -152,12 +150,12 @@ class GatewayService {
     // Add client to hash
     this.hashesClient[hash].push(clientId)
     this.clientsHashes[clientId] = hash
-    this.redis.hset('weplay:clients', clientId, JSON.stringify({hash: hash, io: this.uuid}))
+    this.redis.hset('weplay:clients', clientId, JSON.stringify({hash, io: this.uuid}))
   }
 
   removeClient(clientId, clientNick) {
     delete this.clientsHashes[clientId]
-    for (var hash in this.hashesClient) {
+    for (const hash in this.hashesClient) {
       if (this.hashesClient.hasOwnProperty(hash)) {
         this.hashesClient[hash] = this.hashesClient[hash].filter(c => c !== clientId)
         if (this.hashesClient[hash].length === 0) {
@@ -184,9 +182,7 @@ class GatewayService {
     this.frameBroker.startBroadcastingFrames.bind(this)(room)
   }
 
-  joinStream(hash, socket, clientId) {
-    clientId = clientId === undefined ? socket.id : clientId
-
+  joinStream(hash, socket, clientId = socket.id) {
     // Already joined ?
     if (hash === this.clientsHashes[clientId]) {
       return
@@ -220,9 +216,9 @@ class GatewayService {
    * */
   broadcastEventLog(socket) {
     const args = Array.prototype.slice.call(arguments, 1)
-    var room = socket.room || this.defaultRomHash
-    this.io.to(room).emit.apply(this.io.to(room), args)
-    this.redis.lpush('weplay:log', JSON.stringify({room: room, args: args}))
+    const room = socket.room || this.defaultRomHash
+    this.io.to(room).emit(...args)
+    this.redis.lpush('weplay:log', JSON.stringify({room, args}))
     this.redis.ltrim('weplay:log', 0, 20)
   }
 
@@ -262,4 +258,4 @@ class GatewayService {
   }
 }
 
-module.exports = GatewayService
+export default GatewayService

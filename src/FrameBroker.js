@@ -1,4 +1,4 @@
-const fps = require('fps')
+import fps from 'fps'
 
 class FrameBroker {
   reconnect() {
@@ -28,7 +28,7 @@ class FrameBroker {
         this.tickers[room].on('data', listener)
       }
       this.roomInfo[room] = {}
-      this.bus.streamJoin('compressor', room, 'frame' + room, (frame) => {
+      this.bus.streamJoin('compressor', room, `frame${room}`, (frame) => {
         if (this.tickers[room]) {
           this.tickers[room].tick()
         }
@@ -37,7 +37,7 @@ class FrameBroker {
         this.lastFrameByRoom[room] = frame
         this.io.to(room).emit('frame', frame)
       })
-      this.bus.streamJoin('compressor', room, 'audio' + room, (audio) => {
+      this.bus.streamJoin('compressor', room, `audio${room}`, (audio) => {
         this.roomsTimestamp[room] = Date.now()
         this.io.to(room).emit('audio', audio)
       })
@@ -62,4 +62,4 @@ class FrameBroker {
   }
 }
 
-module.exports = FrameBroker
+export default FrameBroker

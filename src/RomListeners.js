@@ -39,4 +39,4 @@ class RomListeners {
   }
 }
 
-module.exports = RomListeners
+export default RomListeners
