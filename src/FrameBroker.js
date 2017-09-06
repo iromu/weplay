@@ -39,7 +39,7 @@ class FrameBroker {
       })
       this.bus.streamJoin('compressor', room, `audio${room}`, (audio) => {
         this.roomsTimestamp[room] = Date.now()
-        // this.io.to(room).emit('audio', audio)
+        this.io.to(room).emit('audio', audio)
       })
 
       // this.bus.streamJoin('emu', room, 'move' + room, (move) => {
