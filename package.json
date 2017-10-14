@@ -23,9 +23,9 @@
     "eslint-plugin-promise": "^3.5.0",
     "eslint-plugin-standard": "^3.0.1",
     "istanbul": "0.4.5",
-    "mocha": "3.5.3",
-    "sinon": "3.2.1",
-    "sinon-chai": "2.13.0"
+    "mocha": "4.0.1",
+    "sinon": "4.0.1",
+    "sinon-chai": "2.14.0"
   },
   "scripts": {
     "start": "node build/index.js",
