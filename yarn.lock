@@ -3549,7 +3549,7 @@ wbuf@^1.1.0, wbuf@^1.7.2:
 
 "weplay-common@github:iromu/weplay-common#develop":
   version "0.0.2"
-  resolved "https://codeload.github.com/iromu/weplay-common/tar.gz/57c158543d63473d99e9766af0bf5f23f792fd1a"
+  resolved "https://codeload.github.com/iromu/weplay-common/tar.gz/6064d8c91db20ebcb997930e65677411132ff798"
   dependencies:
     debug "3.1.0"
     forwarded-for "1.0.1"
