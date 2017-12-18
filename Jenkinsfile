@@ -1,48 +1,51 @@
-node('node') {
-    currentBuild.result = "SUCCESS"
+pipeline {
+    agent none
 
-    try {
-
-       stage('Checkout'){
-          checkout scm
+    triggers {
+      upstream(upstreamProjects: "weplay-common/" + env.BRANCH_NAME.replaceAll("/", "%2F"), threshold: hudson.model.Result.SUCCESS)
        }
 
+    stages  {
+
         stage('Initialize') {
-          echo 'Initializing...'
-          def node = tool name: 'Node-8.4.0', type: 'jenkins.plugins.nodejs.tools.NodeJSInstallation'
-          env.PATH = "${node}/bin:${env.PATH}"
-          env.NODE_ENV = "test"
+         agent { label 'node'  }
+          steps {
+            script {
+              def node = tool name: 'Node-8.4.0', type: 'jenkins.plugins.nodejs.tools.NodeJSInstallation'
+              env.PATH = "${node}/bin:${env.PATH}"
+            }
           sh 'node -v'
           sh 'yarn install'
         }
 
        stage('Build'){
-         env.NODE_ENV = "test"
-         sh 'node -v'
+         agent { label 'node'  }
+         steps {
          sh 'yarn build'
        }
 
-       stage('Test'){
-         env.NODE_ENV = "test"
-         sh 'yarn test'
+      stage('Docker arm'){
+        agent { label 'arm'  }
+        steps {
+            sh 'docker build --no-cache -t iromu/weplay-io-arm:latest . -f Dockerfile_arm'
+            sh 'docker push iromu/weplay-io-arm:latest'
+        }
+      }
 
+      stage('Docker amd64'){
+        agent { label 'docker'  }
+        steps {
+            sh 'docker build --no-cache -t iromu/weplay-io:latest . -f Dockerfile'
+            sh 'docker push iromu/weplay-io:latest'
+        }
        }
 
-       stage('Link'){
-         env.NODE_ENV = "test"
-         sh 'yarn link'
-       }
-
-       stage('Cleanup'){
-         echo 'prune and cleanup'
-         sh 'rm node_modules -rf'
-         sh 'rm build -rf'
-       }
+      stage('Cleanup'){
+        agent any
+        steps {
+           cleanWs()
+        }
+      }
 
     }
-    catch (err) {
-        currentBuild.result = "FAILURE"
-        throw err
-    }
-
 }
