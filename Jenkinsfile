@@ -14,15 +14,17 @@ pipeline {
               def node = tool name: 'Node-8.4.0', type: 'jenkins.plugins.nodejs.tools.NodeJSInstallation'
               env.PATH = "${node}/bin:${env.PATH}"
             }
-          sh 'node -v'
-          sh 'yarn install'
+            sh 'node -v'
+            sh 'yarn install'
+          }
         }
 
        stage('Build'){
          agent { label 'node'  }
          steps {
-         sh 'yarn build'
-       }
+          sh 'yarn build'
+         }
+      }
 
       stage('Docker arm'){
         agent { label 'arm'  }
@@ -46,4 +48,6 @@ pipeline {
            cleanWs()
         }
       }
+
+    }
 }
